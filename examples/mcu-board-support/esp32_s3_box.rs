@@ -11,7 +11,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::delay::Delay;
 pub use esp_hal::entry;
-use esp_hal::gpio::{Input, Level, Output, Pull};
+use esp_hal::gpio::{Input, Level, Output, Pull, OutputConfig};
 use esp_hal::i2c::master as i2c;
 use esp_hal::prelude::*;
 use esp_hal::rtc_cntl::Rtc;
@@ -57,6 +57,7 @@ impl slint::platform::Platform for EspBackend {
     }
 
     fn run_event_loop(&self) -> Result<(), slint::PlatformError> {
+        let GPIO_config = OutputConfig::default();
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let mut rtc = Rtc::new(peripherals.LPWR);
@@ -85,9 +86,9 @@ impl slint::platform::Platform for EspBackend {
         .with_sck(peripherals.GPIO7)
         .with_mosi(peripherals.GPIO6);
 
-        let dc = Output::new(peripherals.GPIO4, Level::Low);
-        let cs = Output::new(peripherals.GPIO5, Level::Low);
-        let rst = Output::new(peripherals.GPIO48, Level::Low);
+        let dc = Output::new(peripherals.GPIO4, Level::Low, GPIO_config);
+        let cs = Output::new(peripherals.GPIO5, Level::Low, GPIO_config);
+        let rst = Output::new(peripherals.GPIO48, Level::Low, GPIO_config);
 
         let spi = embedded_hal_bus::spi::ExclusiveDevice::new_no_delay(spi, cs).unwrap();
         let mut buffer = [0u8; 512];
@@ -99,7 +100,7 @@ impl slint::platform::Platform for EspBackend {
             .init(&mut delay)
             .unwrap();
 
-        let mut backlight = Output::new(peripherals.GPIO45, Level::High);
+        let mut backlight = Output::new(peripherals.GPIO45, Level::High, GPIO_config);
         backlight.set_high();
 
         let size = display.size();
