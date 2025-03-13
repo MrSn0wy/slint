@@ -81,8 +81,8 @@ impl slint::platform::Platform for EspBackend {
         .with_sda(peripherals.GPIO8)
         .with_scl(peripherals.GPIO18);
 
-        let mut touch = tt21100::TT21100::new(i2c, Input::new(peripherals.GPIO3,  InputConfig::default().with_pull(Pull::Up)))
-            .expect("Initialize the touch device");
+        // let mut touch = tt21100::TT21100::new(i2c, Input::new(peripherals.GPIO3,  InputConfig::default().with_pull(Pull::Up)))
+        //     .expect("Initialize the touch device");
 
         let spi = spi::Spi::new(
             peripherals.SPI2,
@@ -119,7 +119,7 @@ impl slint::platform::Platform for EspBackend {
             buffer: &mut [slint::platform::software_renderer::Rgb565Pixel(0); 320],
         };
 
-        let mut last_touch = None;
+        // let mut last_touch = None;
 
         loop {
             slint::platform::update_timers_and_animations();
@@ -129,46 +129,46 @@ impl slint::platform::Platform for EspBackend {
                 // The hardware keeps a queue of events. We should ideally process all event from the queue before rendering
                 // or we will get outdated event in the next frames. But move events are constantly added to the queue
                 // so we would block the whole interface, so add an arbitrary threshold
-                while event_count < 15 && touch.data_available().unwrap() {
+                while event_count < 15 {
                     event_count += 1;
-                    match touch.event() {
-                        // Ignore error because we sometimes get an error at the beginning
-                        Err(_) => (),
-                        Ok(tt21100::Event::Button(..)) => (),
-                        Ok(tt21100::Event::Touch { report: _, touches }) => {
-                            let button = slint::platform::PointerEventButton::Left;
-                            if let Some(event) = touches
-                                .0
-                                .map(|record| {
-                                    let position = slint::PhysicalPosition::new(
-                                        ((319. - record.x as f32) * size.width as f32 / 319.) as _,
-                                        (record.y as f32 * size.height as f32 / 239.) as _,
-                                    )
-                                    .to_logical(window.scale_factor());
-                                    match last_touch.replace(position) {
-                                        Some(_) => WindowEvent::PointerMoved { position },
-                                        None => WindowEvent::PointerPressed { position, button },
-                                    }
-                                })
-                                .or_else(|| {
-                                    last_touch.take().map(|position| WindowEvent::PointerReleased {
-                                        position,
-                                        button,
-                                    })
-                                })
-                            {
-                                let is_pointer_release_event =
-                                    matches!(event, WindowEvent::PointerReleased { .. });
-
-                                window.try_dispatch_event(event)?;
-
-                                // removes hover state on widgets
-                                if is_pointer_release_event {
-                                    window.try_dispatch_event(WindowEvent::PointerExited)?;
-                                }
-                            }
-                        }
-                    }
+                    // match touch.event() {
+                    //     // Ignore error because we sometimes get an error at the beginning
+                    //     Err(_) => (),
+                    //     Ok(tt21100::Event::Button(..)) => (),
+                    //     Ok(tt21100::Event::Touch { report: _, touches }) => {
+                    //         let button = slint::platform::PointerEventButton::Left;
+                    //         if let Some(event) = touches
+                    //             .0
+                    //             .map(|record| {
+                    //                 let position = slint::PhysicalPosition::new(
+                    //                     ((319. - record.x as f32) * size.width as f32 / 319.) as _,
+                    //                     (record.y as f32 * size.height as f32 / 239.) as _,
+                    //                 )
+                    //                 .to_logical(window.scale_factor());
+                    //                 match last_touch.replace(position) {
+                    //                     Some(_) => WindowEvent::PointerMoved { position },
+                    //                     None => WindowEvent::PointerPressed { position, button },
+                    //                 }
+                    //             })
+                    //             .or_else(|| {
+                    //                 last_touch.take().map(|position| WindowEvent::PointerReleased {
+                    //                     position,
+                    //                     button,
+                    //                 })
+                    //             })
+                    //         {
+                    //             let is_pointer_release_event =
+                    //                 matches!(event, WindowEvent::PointerReleased { .. });
+                    //
+                    //             window.try_dispatch_event(event)?;
+                    //
+                    //             // removes hover state on widgets
+                    //             if is_pointer_release_event {
+                    //                 window.try_dispatch_event(WindowEvent::PointerExited)?;
+                    //             }
+                    //         }
+                    //     }
+                    // }
                 }
 
                 window.draw_if_needed(|renderer| {
