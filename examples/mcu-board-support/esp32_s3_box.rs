@@ -10,13 +10,15 @@ use embedded_hal::digital::OutputPin;
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::delay::Delay;
-pub use esp_hal::entry;
-use esp_hal::gpio::{Input, Level, Output, Pull, OutputConfig};
+// pub use esp_hal::entry;
+use esp_hal::gpio::{Input, Level, Output, Pull, OutputConfig, InputConfig};
 use esp_hal::i2c::master as i2c;
-use esp_hal::prelude::*;
+// use esp_hal::prelude::*;
 use esp_hal::rtc_cntl::Rtc;
 use esp_hal::spi::master as spi;
+use esp_hal::time::Rate;
 use esp_hal::timer::{systimer::SystemTimer, timg::TimerGroup};
+use esp_hal::timer::systimer::Unit;
 use mipidsi::{options::Orientation, Display};
 use slint::platform::WindowEvent;
 
@@ -51,13 +53,16 @@ impl slint::platform::Platform for EspBackend {
     }
 
     fn duration_since_start(&self) -> core::time::Duration {
-        core::time::Duration::from_millis(
-            SystemTimer::now() / (SystemTimer::ticks_per_second() / 1000),
-        )
+        // core::time::Duration::from_millis(
+        let current_ticks = SystemTimer::unit_value(Unit::Unit0);
+        let ticks_per_second = SystemTimer::ticks_per_second();
+        core::time::Duration::from_secs_f64(current_ticks as f64 / ticks_per_second as f64)
+            // SystemTimer::now() / (SystemTimer::ticks_per_second() / 1000),
+        // )
     }
 
     fn run_event_loop(&self) -> Result<(), slint::PlatformError> {
-        let GPIO_config = OutputConfig::default();
+        let gpio_config = OutputConfig::default();
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let mut rtc = Rtc::new(peripherals.LPWR);
@@ -71,24 +76,25 @@ impl slint::platform::Platform for EspBackend {
 
         let i2c = i2c::I2c::new(
             peripherals.I2C0,
-            i2c::Config { frequency: 400u32.kHz(), ..i2c::Config::default() },
-        )
+            i2c::Config::default().with_frequency(Rate::from_khz(400u32)),
+        ).unwrap()
         .with_sda(peripherals.GPIO8)
         .with_scl(peripherals.GPIO18);
 
-        let mut touch = tt21100::TT21100::new(i2c, Input::new(peripherals.GPIO3, Pull::Up))
+        let mut touch = tt21100::TT21100::new(i2c, Input::new(peripherals.GPIO3,  InputConfig::default().with_pull(Pull::Up)))
             .expect("Initialize the touch device");
 
-        let spi = spi::Spi::new_with_config(
+        let spi = spi::Spi::new(
             peripherals.SPI2,
-            spi::Config { frequency: 60u32.MHz(), ..spi::Config::default() },
+            spi::Config::default().with_frequency(Rate::from_mhz(60u32)),
         )
+        .unwrap()
         .with_sck(peripherals.GPIO7)
         .with_mosi(peripherals.GPIO6);
 
-        let dc = Output::new(peripherals.GPIO4, Level::Low, GPIO_config);
-        let cs = Output::new(peripherals.GPIO5, Level::Low, GPIO_config);
-        let rst = Output::new(peripherals.GPIO48, Level::Low, GPIO_config);
+        let dc = Output::new(peripherals.GPIO4, Level::Low, gpio_config);
+        let cs = Output::new(peripherals.GPIO5, Level::Low, gpio_config);
+        let rst = Output::new(peripherals.GPIO48, Level::Low, gpio_config);
 
         let spi = embedded_hal_bus::spi::ExclusiveDevice::new_no_delay(spi, cs).unwrap();
         let mut buffer = [0u8; 512];
@@ -100,7 +106,7 @@ impl slint::platform::Platform for EspBackend {
             .init(&mut delay)
             .unwrap();
 
-        let mut backlight = Output::new(peripherals.GPIO45, Level::High, GPIO_config);
+        let mut backlight = Output::new(peripherals.GPIO45, Level::High, gpio_config);
         backlight.set_high();
 
         let size = display.size();
